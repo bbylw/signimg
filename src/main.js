@@ -80,7 +80,12 @@ class App {
           </div>
         </div>
         <div class="preview-section">
-          <div id="previewContainer"></div>
+          <div id="previewContainer" class="preview-container">
+            <!-- 文档预览将在这里显示 -->
+          </div>
+          <div id="signaturePreview" class="signature-preview" draggable="true">
+            <!-- 签名预览将在这里显示 -->
+          </div>
         </div>
         <button id="generateSignature" class="btn primary">生成签名文档</button>
       </div>
@@ -177,10 +182,43 @@ class App {
       textPreview.style.display = 'flex';
     };
 
-    signatureText.addEventListener('input', updateTextPreview);
-    fontSize.addEventListener('input', updateTextPreview);
-    fontFamily.addEventListener('change', updateTextPreview);
-    textColor.addEventListener('input', updateTextPreview);
+    // 添加签名预览更新
+    const updatePreview = () => {
+      if (this.signatureTool) {
+        this.signatureTool.updateSignaturePreview();
+      }
+    };
+
+    // 文字签名更新
+    signatureText.addEventListener('input', () => {
+      updateTextPreview();
+      updatePreview();
+    });
+    fontSize.addEventListener('input', () => {
+      updateTextPreview();
+      updatePreview();
+    });
+    fontFamily.addEventListener('change', () => {
+      updateTextPreview();
+      updatePreview();
+    });
+    textColor.addEventListener('input', () => {
+      updateTextPreview();
+      updatePreview();
+    });
+
+    // 手写签名更新
+    this.signatureTool.canvas.on('path:created', updatePreview);
+    clearButton.addEventListener('click', () => {
+      this.signatureTool.clear();
+      updatePreview();
+    });
+
+    // 文档上传后更新预览
+    documentInput.addEventListener('change', async (event) => {
+      await this.handleDocumentUpload(event);
+      updatePreview();
+    });
   }
 
   async handleDocumentUpload(event) {

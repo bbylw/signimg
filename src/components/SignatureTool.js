@@ -20,6 +20,8 @@ export class SignatureTool {
     this.signatureMode = 'handwrite';
     
     window.addEventListener('resize', this.handleResize.bind(this));
+    this.signaturePosition = { x: 0, y: 0 };
+    this.setupSignaturePreview();
   }
 
   handleResize() {
@@ -180,6 +182,82 @@ export class SignatureTool {
     });
   }
 
+  setupSignaturePreview() {
+    const preview = document.getElementById('signaturePreview');
+    let isDragging = false;
+    let startX, startY;
+
+    preview.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = true;
+      preview.classList.add('dragging');
+      const rect = preview.getBoundingClientRect();
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const container = document.getElementById('previewContainer');
+      const containerRect = container.getBoundingClientRect();
+      
+      let newX = e.clientX - containerRect.left - startX;
+      let newY = e.clientY - containerRect.top - startY;
+      
+      // 限制在容器内
+      newX = Math.max(0, Math.min(newX, containerRect.width - preview.offsetWidth));
+      newY = Math.max(0, Math.min(newY, containerRect.height - preview.offsetHeight));
+      
+      preview.style.left = `${newX}px`;
+      preview.style.top = `${newY}px`;
+      
+      // 保存位置（转换为百分比）
+      this.signaturePosition = {
+        x: (newX / containerRect.width) * 100,
+        y: (newY / containerRect.height) * 100
+      };
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        preview.classList.remove('dragging');
+      }
+    });
+  }
+
+  updateSignaturePreview() {
+    const preview = document.getElementById('signaturePreview');
+    const container = document.getElementById('previewContainer');
+    
+    if (!container || !preview) return;
+    
+    // 设置初始位置（如果还没有设置）
+    if (!preview.style.left) {
+      const containerRect = container.getBoundingClientRect();
+      preview.style.left = `${containerRect.width - 200}px`;
+      preview.style.top = `${containerRect.height - 100}px`;
+      
+      this.signaturePosition = {
+        x: 80,  // 默认在右下角
+        y: 80
+      };
+    }
+
+    if (this.signatureMode === 'text') {
+      const text = document.getElementById('signatureText').value || '预览签名';
+      preview.textContent = text;
+      preview.style.fontFamily = `${document.getElementById('fontFamily').value}, cursive`;
+      preview.style.fontSize = `${document.getElementById('fontSize').value}px`;
+      preview.style.color = document.getElementById('textColor').value;
+    } else {
+      const signatureData = this.canvas.toDataURL();
+      preview.innerHTML = `<img src="${signatureData}" style="max-width: 200px;">`;
+    }
+    preview.style.display = 'block';
+  }
+
   async generateSignedDocument() {
     if (!this.documentImage) {
       throw new Error('请先上传文档');
@@ -294,6 +372,11 @@ export class SignatureTool {
             strokeWidth: text.strokeWidth * (0.8 + Math.random() * 0.4)  // 随机笔画粗细
           });
 
+          text.set({
+            left: (this.signaturePosition.x / 100) * finalCanvas.width,
+            top: (this.signaturePosition.y / 100) * finalCanvas.height
+          });
+
           finalCanvas.add(text);
           const dataUrl = finalCanvas.toDataURL({format: 'png'});
           resolve(dataUrl);
@@ -303,8 +386,8 @@ export class SignatureTool {
           fabric.Image.fromURL(signatureData, (signature) => {
             signature.scale(0.5);
             signature.set({
-              left: finalCanvas.width - signature.width * 0.5 - 50,
-              top: finalCanvas.height - signature.height * 0.5 - 50
+              left: (this.signaturePosition.x / 100) * finalCanvas.width,
+              top: (this.signaturePosition.y / 100) * finalCanvas.height
             });
             finalCanvas.add(signature);
             const dataUrl = finalCanvas.toDataURL({format: 'png'});
